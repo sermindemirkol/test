@@ -12,6 +12,7 @@ func (w *Worker) Run() {
 
 	queue := make(chan [2]string)
 	cid := w.WorkerId
+	message:=w.Message
 	t := randomSource.Int31()
 
 	hostname, err := os.Hostname()
@@ -91,8 +92,8 @@ func (w *Worker) Run() {
 
 	t0 := time.Now()
 	for i := 0; i < w.Nmessages; i++ {
-		text := fmt.Sprintf("this is msg #%d!", i)
-		token := publisher.Publish(topicName, 0, false, text)
+		text := fmt.Sprintf("%s #%d !", message,i)
+		token := publisher.Publish(topicName, 0, false, message)
 		publishedCount++
 		token.Wait()
 	}
