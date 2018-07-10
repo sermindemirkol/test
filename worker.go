@@ -61,14 +61,14 @@ func (w *Worker) Run() {
 	}
 
 	defer func() {
-		verboseLogger.Printf("[%d] unsubscribe\n", w.WorkerId)
-
 		if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
 			fmt.Println(token.Error())
 			os.Exit(1)
 		}
 
 		subscriber.Disconnect(5)
+		verboseLogger.Printf("[%d] unsubscribe\n", w.WorkerId)
+		
 	}()
 
 	verboseLogger.Printf("[%d] subscribing to topic\n", w.WorkerId)
