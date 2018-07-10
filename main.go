@@ -25,7 +25,7 @@ var (
 	publisherClientIdTemplate  = "mqtt-stresser-pub-%s-worker%d-%d"
 	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d-%d"
 
-	opTimeout = 5 * time.Second
+	opTimeout = 10 * time.Second
 
 	errorLogger   = log.New(os.Stderr, "ERROR: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
 	verboseLogger = log.New(os.Stderr, "DEBUG: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
