@@ -125,10 +125,7 @@ func main() {
 
 	for cid := 0; cid < *argNumClients; cid++ {
 
-		if cid%rampUpSize == 0 && cid > 0 {
-			fmt.Printf("%d worker started - waiting %s - waiting %s\n", cid, rampUpDelay,message)
-			time.Sleep(rampUpDelay)
-		}
+		fmt.Printf("--------------------%d worker started-------------------- \n", cid,)
 
 		go (&Worker{
 			WorkerId:  cid,
@@ -194,6 +191,7 @@ func main() {
 	exitCode := 0
 
 	if err != nil {
+	fmt.Printf("Error is  %s.\n", err)
 		exitCode = 1
 	} else {
 		printSummary(summary)
