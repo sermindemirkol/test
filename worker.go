@@ -1,164 +1,234 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
+	"io/ioutil"
+	"log"
+	"math/rand"
 	"os"
+	"os/signal"
+	"runtime"
+	"runtime/pprof"
+	"syscall"
 	"time"
 )
 
-func (w *Worker) Run() {
-	verboseLogger.Printf("[%d] initializing\n", w.WorkerId)
+var (
+	resultChan         = make(chan Result)
+	abortChan          = make(chan bool)
+	stopWaitLoop       = false
+	tearDownInProgress = false
+	randomSource       = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	queue := make(chan [2]string)
-	cid := w.WorkerId
-	message:=w.Message
-	t := randomSource.Int31()
+	subscriberClientIdTemplate = "mqtt-stresser-sub-%s-worker%d-%d"
+	publisherClientIdTemplate  = "mqtt-stresser-pub-%s-worker%d-%d"
+	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d-%d"
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
+	opTimeout = 5 * time.Second
+
+	errorLogger   = log.New(os.Stderr, "ERROR: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
+	verboseLogger = log.New(os.Stderr, "DEBUG: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
+
+	argNumClients    = flag.Int("num-clients", 10, "Number of concurrent clients")
+	argNumMessages   = flag.Int("num-messages", 10, "Number of messages shipped by client")
+	argMessage      = flag.String("message", "", "Message")
+	argTimeout       = flag.String("timeout", "5s", "Timeout for pub/sub loop")
+	argGlobalTimeout = flag.String("global-timeout", "60s", "Timeout spanning all operations")
+	argRampUpSize    = flag.Int("rampup-size", 100, "Size of rampup batch")
+	argRampUpDelay   = flag.String("rampup-delay", "500ms", "Time between batch rampups")
+	argTearDownDelay = flag.String("teardown-delay", "5s", "Graceperiod to complete remaining workers")
+	argBrokerUrl     = flag.String("broker", "", "Broker URL")
+	argUsername      = flag.String("username", "", "Username")
+	argPassword      = flag.String("password", "", "Password")
+	argLogLevel      = flag.Int("log-level", 0, "Log level (0=nothing, 1=errors, 2=debug, 3=error+debug)")
+	argProfileCpu    = flag.String("profile-cpu", "", "write cpu profile `file`")
+	argProfileMem    = flag.String("profile-mem", "", "write memory profile to `file`")
+	argHideProgress  = flag.Bool("no-progress", false, "Hide progress indicator")
+	argHelp          = flag.Bool("help", false, "Show help")
+)
+
+type Worker struct {
+	WorkerId  int
+	BrokerUrl string
+	Username  string
+	Password  string
+	Nmessages int
+	Message  string
+	Timeout   time.Duration
+}
+
+type Result struct {
+	WorkerId          int
+	Event             string
+	PublishTime       time.Duration
+	ReceiveTime       time.Duration
+	MessagesReceived  int
+	MessagesPublished int
+	Error             bool
+	ErrorMessage      error
+}
+
+func main() {
+	flag.Parse()
+
+	if flag.NFlag() < 1 || *argHelp {
+		flag.Usage()
+		os.Exit(1)
 	}
 
-	topicName := fmt.Sprintf(topicNameTemplate, hostname, w.WorkerId, t)
-	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, w.WorkerId, t,)
-	publisherClientId := fmt.Sprintf(publisherClientIdTemplate, hostname, w.WorkerId, t)
+	if *argProfileCpu != "" {
+		f, err := os.Create(*argProfileCpu)
 
-	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s publisherClientId=%s\n", cid, topicName, subscriberClientId, publisherClientId)
-
-	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(w.Username).SetPassword(w.Password).AddBroker(w.BrokerUrl)
-
-	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).AddBroker(w.BrokerUrl)
-
-	subscriberOptions.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
-		queue <- [2]string{msg.Topic(), string(msg.Payload())}
-	})
-
-	publisher := mqtt.NewClient(publisherOptions)
-	subscriber := mqtt.NewClient(subscriberOptions)
-
-	verboseLogger.Printf("[%d] connecting publisher\n", w.WorkerId)
-	if token := publisher.Connect(); token.Wait() && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
+		if err != nil {
+			fmt.Printf("Could not create CPU profile: %s\n", err)
 		}
-		return
+
+		if err := pprof.StartCPUProfile(f); err != nil {
+			fmt.Printf("Could not start CPU profile: %s\n", err)
+		}
 	}
 
-	verboseLogger.Printf("[%d] connecting subscriber\n", w.WorkerId)
-	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
+	num := *argNumMessages
+	brokerUrl := *argBrokerUrl
+	username := *argUsername
+	message := *argMessage
+	password := *argPassword
+	testTimeout, _ := time.ParseDuration(*argTimeout)
 
-		return
+	verboseLogger.SetOutput(ioutil.Discard)
+	errorLogger.SetOutput(ioutil.Discard)
+
+	if *argLogLevel == 1 || *argLogLevel == 3 {
+		errorLogger.SetOutput(os.Stderr)
 	}
 
-	defer func() {
-		verboseLogger.Printf("[%d] unsubscribe\n", w.WorkerId)
-
-		if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
-			fmt.Println(token.Error())
-			os.Exit(1)
-		}
-
-		subscriber.Disconnect(5)
-	}()
-
-	verboseLogger.Printf("[%d] subscribing to topic\n", w.WorkerId)
-	if token := subscriber.Subscribe(topicName, 0, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "SubscribeFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-
-		return
+	if *argLogLevel == 2 || *argLogLevel == 3 {
+		verboseLogger.SetOutput(os.Stderr)
 	}
 
-	verboseLogger.Printf("[%d] starting control loop %s\n", w.WorkerId, topicName)
+	if brokerUrl == "" {
+		os.Exit(1)
+	}
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
+
+	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
+	rampUpSize := *argRampUpSize
+
+	if rampUpSize < 0 {
+		rampUpSize = 100
+	}
+
+	resultChan = make(chan Result, *argNumClients**argNumMessages)
+
+	for cid := 0; cid < *argNumClients; cid++ {
+
+		if cid%rampUpSize == 0 && cid > 0 {
+			fmt.Printf("%d worker started - waiting %s- message is  %s\n", cid, rampUpDelay,message)
+			time.Sleep(rampUpDelay)
+		}
+
+		go (&Worker{
+			WorkerId:  cid,
+			BrokerUrl: brokerUrl,
+			Username:  username,
+			Password:  password,
+			Nmessages: num,
+			Message: message,
+			Timeout:   testTimeout,
+		}).Run()
+	}
+	fmt.Printf("%d worker started\n", *argNumClients)
+
+	finEvents := 0
 
 	timeout := make(chan bool, 1)
-	stopWorker := false
-	receivedCount := 0
-	publishedCount := 0
-
-	t0 := time.Now()
-	for i := 0; i < w.Nmessages; i++ {
-		verboseLogger.Printf("[%s] [%d] !", message,i)
-		token := publisher.Publish(topicName, 0, false, message)
-		publishedCount++
-		token.Wait()
-	}
-	publisher.Disconnect(5)
-
-	publishTime := time.Since(t0)
-	verboseLogger.Printf("[%d] all messages published\n", w.WorkerId)
+	globalTimeout, _ := time.ParseDuration(*argGlobalTimeout)
+	results := make([]Result, *argNumClients)
 
 	go func() {
-		time.Sleep(w.Timeout)
+		time.Sleep(globalTimeout)
 		timeout <- true
 	}()
 
-	t0 = time.Now()
-	for receivedCount < w.Nmessages && !stopWorker {
+	for finEvents < *argNumClients && !stopWaitLoop {
 		select {
-		case <-queue:
-			receivedCount++
+		case msg := <-resultChan:
+			results[msg.WorkerId] = msg
 
-			verboseLogger.Printf("[%d] %d/%d received\n", w.WorkerId, receivedCount, w.Nmessages)
-			if receivedCount == w.Nmessages {
-				resultChan <- Result{
-					WorkerId:          w.WorkerId,
-					Event:             "Completed",
-					PublishTime:       publishTime,
-					ReceiveTime:       time.Since(t0),
-					MessagesReceived:  receivedCount,
-					MessagesPublished: publishedCount,
+			if msg.Event == "Completed" || msg.Error {
+				finEvents++
+				verboseLogger.Printf("%d/%d events received\n", finEvents, *argNumClients)
+			}
+
+			if msg.Error {
+				errorLogger.Println(msg)
+			}
+
+			if *argHideProgress == false {
+				if msg.Event == "Completed" {
+					fmt.Print(".")
 				}
-			} else {
-				resultChan <- Result{
-					WorkerId:          w.WorkerId,
-					Event:             "ProgressReport",
-					PublishTime:       publishTime,
-					ReceiveTime:       time.Since(t0),
-					MessagesReceived:  receivedCount,
-					MessagesPublished: publishedCount,
+
+				if msg.Error {
+					fmt.Print("E")
 				}
 			}
+
 		case <-timeout:
-			verboseLogger.Printf("[%d] timeout!!\n", cid)
-			stopWorker = true
+			fmt.Println()
+			fmt.Printf("Aborted because global timeout (%s) was reached.\n", *argGlobalTimeout)
 
-			resultChan <- Result{
-				WorkerId:          w.WorkerId,
-				Event:             "TimeoutExceeded",
-				PublishTime:       publishTime,
-				MessagesReceived:  receivedCount,
-				MessagesPublished: publishedCount,
-				Error:             true,
-			}
-		case <-abortChan:
-			verboseLogger.Printf("[%d] received abort signal", w.WorkerId)
-			stopWorker = true
+			go tearDownWorkers()
+		case signal := <-signalChan:
+			fmt.Println()
+			fmt.Printf("Received %s. Aborting.\n", signal)
 
-			resultChan <- Result{
-				WorkerId:          w.WorkerId,
-				Event:             "Aborted",
-				PublishTime:       publishTime,
-				MessagesReceived:  receivedCount,
-				MessagesPublished: publishedCount,
-				Error:             false,
-			}
+			go tearDownWorkers()
 		}
 	}
 
-	verboseLogger.Printf("[%d] worker finished\n", w.WorkerId)
+	summary, err := buildSummary(*argNumClients, num, results)
+	exitCode := 0
+
+	if err != nil {
+		exitCode = 1
+	} else {
+		printSummary(summary)
+	}
+
+	if *argProfileMem != "" {
+		f, err := os.Create(*argProfileMem)
+
+		if err != nil {
+			fmt.Printf("Could not create memory profile: %s\n", err)
+		}
+
+		runtime.GC() // get up-to-date statistics
+
+		if err := pprof.WriteHeapProfile(f); err != nil {
+			fmt.Printf("Could not write memory profile: %s\n", err)
+		}
+		f.Close()
+	}
+
+	pprof.StopCPUProfile()
+
+	os.Exit(exitCode)
+}
+
+func tearDownWorkers() {
+	if !tearDownInProgress {
+		tearDownInProgress = true
+
+		close(abortChan)
+
+		delay, _ := time.ParseDuration(*argTearDownDelay)
+		fmt.Printf("Waiting %s for remaining workers\n", delay)
+		time.Sleep(delay)
+
+		stopWaitLoop = true
+	}
 }
