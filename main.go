@@ -92,7 +92,6 @@ func main() {
 	num := *argNumMessages
 	brokerUrl := *argBrokerUrl
 	username := *argUsername
-	message := *argMessage
 	password := *argPassword
 	testTimeout, _ := time.ParseDuration(*argTimeout)
 
@@ -116,6 +115,7 @@ func main() {
 
 	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
 	rampUpSize := *argRampUpSize
+	message := *argMessage
 
 	if rampUpSize < 0 {
 		rampUpSize = 100
@@ -126,7 +126,7 @@ func main() {
 	for cid := 0; cid < *argNumClients; cid++ {
 
 		if cid%rampUpSize == 0 && cid > 0 {
-			fmt.Printf("%d worker started - waiting %s\n", cid, rampUpDelay)
+			fmt.Printf("%d worker started - waiting %s - waiting %s\n", cid, rampUpDelay,message)
 			time.Sleep(rampUpDelay)
 		}
 
