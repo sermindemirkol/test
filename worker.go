@@ -49,7 +49,7 @@ func (w *Worker) Run() {
 	}
 
 	verboseLogger.Printf("[%d] connecting subscriber\n", w.WorkerId)
-	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "ConnectFailed",
@@ -61,7 +61,7 @@ func (w *Worker) Run() {
 	}
 
 	verboseLogger.Printf("[%d] subscribing to topic\n", w.WorkerId)
-	if token := subscriber.Subscribe(topicName, 0, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Subscribe(topicName, 0, nil); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "SubscribeFailed",
@@ -71,9 +71,9 @@ func (w *Worker) Run() {
 
 		return
 	}
-
+	
 	defer func() {
-		if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
+		if token := subscriber.Unsubscribe(topicName); token.Wait() && token.Error() != nil {
 			fmt.Println(token.Error())
 			os.Exit(1)
 		}
@@ -82,7 +82,7 @@ func (w *Worker) Run() {
 		verboseLogger.Printf("[%d] unsubscribe\n", w.WorkerId)
 		
 	}()
-	
+
 	verboseLogger.Printf("[%d] starting control loop %s\n", w.WorkerId, topicName)
 
 	timeout := make(chan bool, 1)
