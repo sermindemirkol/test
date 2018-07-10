@@ -125,7 +125,7 @@ func main() {
 
 	for cid := 0; cid < *argNumClients; cid++ {
 
-		fmt.Printf("--------------------%d worker started-------------------- \n", cid,)
+		fmt.Printf("--------------------%d worker started--------------------%d%d \n", cid,rampUpDelay,rampUpSize)
 
 		go (&Worker{
 			WorkerId:  cid,
