@@ -25,7 +25,7 @@ var (
 	publisherClientIdTemplate  = "mqtt-stresser-pub-%s-worker%d-%d"
 	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d-%d"
 
-	opTimeout = 30 * time.Second
+	opTimeout = 20 * time.Second
 
 	errorLogger   = log.New(os.Stderr, "ERROR: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
 	verboseLogger = log.New(os.Stderr, "DEBUG: ", log.Lmicroseconds|log.Ltime|log.Lshortfile)
@@ -122,9 +122,10 @@ func main() {
 	}
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
-	fmt.Printf("%d%d \n",rampUpDelay,rampUpSize)
+
 	for cid := 0; cid < *argNumClients; cid++ {
-		
+
+		fmt.Printf("--------------------%d worker started--------------------%d%d \n", cid,rampUpDelay,rampUpSize)
 
 		go (&Worker{
 			WorkerId:  cid,
