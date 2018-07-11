@@ -122,8 +122,10 @@ func main() {
 	}
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
-
+	fmt.Printf("%d%d \n",rampUpDelay,rampUpSize)
 	for cid := 0; cid < *argNumClients; cid++ {
+		
+
 		go (&Worker{
 			WorkerId:  cid,
 			BrokerUrl: brokerUrl,
