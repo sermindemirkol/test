@@ -124,9 +124,6 @@ func main() {
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
 
 	for cid := 0; cid < *argNumClients; cid++ {
-
-		fmt.Printf("--------------------%d worker started--------------------%d%d \n", cid,rampUpDelay,rampUpSize)
-
 		go (&Worker{
 			WorkerId:  cid,
 			BrokerUrl: brokerUrl,
