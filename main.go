@@ -56,7 +56,7 @@ type Worker struct {
 	Password  string
 	Nmessages int
 	Message  string
-	Qos 	 int
+	Qos 	 byte
 	Timeout   time.Duration
 }
 
@@ -118,9 +118,8 @@ func main() {
 	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
 	rampUpSize := *argRampUpSize
 	message := *argMessage
-	qos := *argQos
+	qos := byte(*argQos)
 	
-
 	if rampUpSize < 0 {
 		rampUpSize = 100
 	}
