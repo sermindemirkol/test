@@ -32,7 +32,8 @@ var (
 
 	argNumClients    = flag.Int("num-clients", 10, "Number of concurrent clients")
 	argNumMessages   = flag.Int("num-messages", 10, "Number of messages shipped by client")
-	argMessage      = flag.String("message", "", "Message")
+	argMessage       = flag.String("message", "", "Message")
+	argQos      	 = flag.String("qos", 0, "Qos")
 	argTimeout       = flag.String("timeout", "5s", "Timeout for pub/sub loop")
 	argGlobalTimeout = flag.String("global-timeout", "60s", "Timeout spanning all operations")
 	argRampUpSize    = flag.Int("rampup-size", 100, "Size of rampup batch")
@@ -55,6 +56,7 @@ type Worker struct {
 	Password  string
 	Nmessages int
 	Message  string
+	Qos 	 int
 	Timeout   time.Duration
 }
 
@@ -116,17 +118,22 @@ func main() {
 	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
 	rampUpSize := *argRampUpSize
 	message := *argMessage
+	qos := *argQos
+	
 
 	if rampUpSize < 0 {
 		rampUpSize = 100
 	}
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
-
+	
 	for cid := 0; cid < *argNumClients; cid++ {
 
-		fmt.Printf("--------------------%d worker started--------------------%d%d \n", cid,rampUpDelay,rampUpSize)
-
+		if cid%rampUpSize == 0 && cid > 0 {
+			fmt.Printf("%d worker started - waiting %s qos: %d\n", cid, rampUpDelay,qos)
+			time.Sleep(rampUpDelay)
+		}
+		
 		go (&Worker{
 			WorkerId:  cid,
 			BrokerUrl: brokerUrl,
@@ -134,6 +141,7 @@ func main() {
 			Password:  password,
 			Nmessages: num,
 			Message: message,
+			Qos: qos,
 			Timeout:   testTimeout,
 		}).Run()
 	}

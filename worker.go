@@ -11,8 +11,11 @@ func (w *Worker) Run() {
 	verboseLogger.Printf("[%d] initializing\n", w.WorkerId)
 
 	queue := make(chan [2]string)
+	
 	cid := w.WorkerId
 	message:=w.Message
+	qos=w.Qos
+	
 	t := randomSource.Int31()
 
 	hostname, err := os.Hostname()
@@ -61,7 +64,7 @@ func (w *Worker) Run() {
 	}
 
 	verboseLogger.Printf("[%d] subscribing to topic\n", w.WorkerId)
-	if token := subscriber.Subscribe(topicName, 1, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Subscribe(topicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "SubscribeFailed",
@@ -93,7 +96,7 @@ func (w *Worker) Run() {
 	t0 := time.Now()
 	for i := 0; i < w.Nmessages; i++ {
 		verboseLogger.Printf("[%s] [%d] !", message,i)
-		token := publisher.Publish(topicName, 1, false, message)
+		token := publisher.Publish(topicName, qos, false, message)
 		publishedCount++
 		token.Wait()
 	}
