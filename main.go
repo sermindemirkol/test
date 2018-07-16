@@ -33,7 +33,7 @@ var (
 	argNumClients    = flag.Int("num-clients", 10, "Number of concurrent clients")
 	argNumMessages   = flag.Int("num-messages", 10, "Number of messages shipped by client")
 	argMessage       = flag.String("message", "", "Message")
-	argQos      	 = flag.String("qos", 0, "Qos")
+	argQos      	 = flag.Int("qos", 0, "Qos")
 	argTimeout       = flag.String("timeout", "5s", "Timeout for pub/sub loop")
 	argGlobalTimeout = flag.String("global-timeout", "60s", "Timeout spanning all operations")
 	argRampUpSize    = flag.Int("rampup-size", 100, "Size of rampup batch")
