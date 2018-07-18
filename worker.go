@@ -13,7 +13,6 @@ func (w *Worker) Run() {
 	queue := make(chan [2]string)
 	
 	cid := w.WorkerId
-	message := w.Message
 	qos := w.Qos
 	
 	t := randomSource.Int31()
