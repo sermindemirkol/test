@@ -35,19 +35,7 @@ func (w *Worker) Run() {
 	
 	subscriber := mqtt.NewClient(subscriberOptions)
 
-	verboseLogger.Printf("[%d] connecting subscriber  [%s] \n", w.WorkerId,w.TopicName)
-	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-
-		return
-	}
-
-	verboseLogger.Printf("[%d] subscribing to topic [%s]\n", w.WorkerId,w.TopicName)
+	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n", w.WorkerId,w.TopicName)
 	if token := subscriber.Subscribe(w.TopicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
@@ -60,6 +48,19 @@ func (w *Worker) Run() {
 	}
 	
 	
+	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
+	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:     w.WorkerId,
+			Event:        "ConnectFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+
+		return
+	}
+	
+	time.Sleep(6 * time.Second)
 	
 	defer func() {
 		if token := subscriber.Unsubscribe(w.TopicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
@@ -68,11 +69,11 @@ func (w *Worker) Run() {
 		}
 
 		subscriber.Disconnect(5)
-		verboseLogger.Printf("[%d] unsubscribe\n", w.WorkerId)
+		verboseLogger.Printf("---[%d] unsubscribe\n", w.WorkerId)
 		
 	}()
 
-	verboseLogger.Printf("[%d] starting control loop %s\n", w.WorkerId, w.TopicName)
+	verboseLogger.Printf("----------Result -----------\n")
 
 	timeout := make(chan bool, 1)
 	stopWorker := false
