@@ -90,6 +90,7 @@ func (w *Worker) Run() {
 		timeout <- true
 	}()
 
+verboseLogger.Printf("**dddddddddddddddddd***************** [%s] \n",queue)
 	for receivedCount < w.Nmessages && !stopWorker {
 		select {
 		case <-queue:
