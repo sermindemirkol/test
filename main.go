@@ -43,7 +43,6 @@ var (
 	argBrokerUrl     = flag.String("broker", "", "Broker URL")
 	argUsername      = flag.String("username", "", "Username")
 	argPassword      = flag.String("password", "", "Password")
-	argLogLevel      = flag.Int("log-level", 0, "Log level (0=nothing, 1=errors, 2=debug, 3=error+debug)")
 	argProfileCpu    = flag.String("profile-cpu", "", "write cpu profile `file`")
 	argProfileMem    = flag.String("profile-mem", "", "write memory profile to `file`")
 	argHideProgress  = flag.Bool("no-progress", false, "Hide progress indicator")
@@ -101,15 +100,9 @@ func main() {
 	
 	verboseLogger.SetOutput(ioutil.Discard)
 	errorLogger.SetOutput(ioutil.Discard)
-
-	if *argLogLevel == 1 || *argLogLevel == 3 {
-		errorLogger.SetOutput(os.Stderr)
-	}
-
-	if *argLogLevel == 2 || *argLogLevel == 3 {
-		verboseLogger.SetOutput(os.Stderr)
-	}
-
+	errorLogger.SetOutput(os.Stderr)
+	verboseLogger.SetOutput(os.Stderr)
+	
 	if brokerUrl == "" {
 		os.Exit(1)
 	}
@@ -164,7 +157,9 @@ func main() {
 	}
 	
 	publisher.Disconnect(5)
-	verboseLogger.Printf("all messages published\n")
+
+	publishTime := time.Since(time.Now())
+	verboseLogger.Printf("all messages published %d \n",publishTime)
 	
 	fmt.Printf("%d worker started\n", *argNumClients)
 
