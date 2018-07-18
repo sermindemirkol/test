@@ -65,7 +65,6 @@ type Worker struct {
 type Result struct {
 	WorkerId          int
 	Event             string
-	PublishTime       time.Duration
 	ReceiveTime       time.Duration
 	MessagesReceived  int
 	MessagesPublished int
@@ -164,8 +163,6 @@ func main() {
 	}
 	
 	publisher.Disconnect(5)
-
-	publishTime := time.Since(time.Now())
 	verboseLogger.Printf("all messages published\n")
 	
 	fmt.Printf("%d worker started\n", *argNumClients)
