@@ -29,12 +29,18 @@ func (w *Worker) Run() {
 	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(30).AddBroker(w.BrokerUrl)
 
 	subscriberOptions.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
-		queue <- [2]string{msg.Topic(), string(msg.Payload())}
+		queue <- [2]string{msg.Topic(), string(msg.Payload())
+
+		}
 	})
 
+	var callback MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
+              verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
+	}
 	
 	subscriber := mqtt.NewClient(subscriberOptions)
-
+	
 	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
 	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
@@ -50,7 +56,7 @@ func (w *Worker) Run() {
 	time.Sleep(3 * time.Second)
 	
 	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n", w.WorkerId,w.TopicName)
-	if token := subscriber.Subscribe(w.TopicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Subscribe(w.TopicName, qos, callback); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "SubscribeFailed",
@@ -90,7 +96,6 @@ func (w *Worker) Run() {
 		timeout <- true
 	}()
 
-verboseLogger.Printf("**dddddddddddddddddd***************** [%s] \n",queue)
 	for receivedCount < w.Nmessages && !stopWorker {
 		select {
 		case <-queue:
