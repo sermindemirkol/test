@@ -35,10 +35,6 @@ func (w *Worker) Run() {
 	
 	subscriber := mqtt.NewClient(subscriberOptions)
 
-subscriber.setCallback(
-
-
-)
 	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
 	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
