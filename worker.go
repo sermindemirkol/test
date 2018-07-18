@@ -8,7 +8,7 @@ import (
 )
 
 func (w *Worker) Run() {
-	verboseLogger.Printf("[%d] initializing\n", w.WorkerId)
+	verboseLogger.Printf("[%d] initializing \n", w.WorkerId)
 
 	queue := make(chan [2]string)
 	
@@ -80,7 +80,7 @@ func (w *Worker) Run() {
 	publishedCount := 0
 
 
-	t0 := time.Now()
+	t0 = time.Now()
 	publishTime := time.Since(t0)
 
 	go func() {

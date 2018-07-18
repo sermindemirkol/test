@@ -24,7 +24,7 @@ var (
 
 	subscriberClientIdTemplate = "mqtt-stresser-sub-%s-worker%d-%d"
 	publisherClientIdTemplate  = "mqtt-stresser-pub-%s-worker%d-%d"
-	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d-%d"
+	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d"
 
 	opTimeout = 20 * time.Second
 
@@ -139,7 +139,7 @@ func main() {
 	for cid := 0; cid < *argNumClients; cid++ {
 	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
 	  for i := 0; i < num; i++ {
-		fmt.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
+		verboseLogger.Printf("[%s] [%d] with topicName [%s]\n", message,i,topicName)
 		token := publisher.Publish(topicName, qos, false, message)
 		token.Wait()
 	  }
