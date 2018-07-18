@@ -81,7 +81,7 @@ func (w *Worker) Run() {
 	publishedCount := 0
 
 
-	t0 = time.Now()
+	t0 := time.Now()
 	publishTime := time.Since(t0)
 
 	go func() {
