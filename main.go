@@ -49,18 +49,6 @@ var (
 	argHelp          = flag.Bool("help", false, "Show help")
 )
 
-type Worker struct {
-	WorkerId  int
-	BrokerUrl string
-	Username  string
-	Password  string
-	Nmessages int
-	Message  string
-	Qos 	 byte
-	TopicName string
-	Timeout   time.Duration
-}
-
 type Result struct {
 	WorkerId          int
 	Event             string
@@ -138,18 +126,57 @@ func main() {
 	
 	for cid := 0; cid < *argNumClients; cid++ {
 	    topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
-		go (&Worker{
-			WorkerId:  cid,
-			BrokerUrl: brokerUrl,
-			Username:  username,
-			Password:  password,
-			Nmessages: num,
-			Message: message,
-			Qos: qos,
-			TopicName: topicName,
-			Timeout:   testTimeout,
-		}).Run()
+	    
+	    
+	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, cid, t1)
+	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s\n", cid,topicName, subscriberClientId)
+
+	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(username).SetPassword(password).SetKeepAlive(30).AddBroker(brokerUrl)
+	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
+              verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
 	}
+	
+	subscriber := mqtt.NewClient(subscriberOptions)
+	
+	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
+	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:     cid,
+			Event:        "ConnectFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+
+		return
+	}
+	
+	time.Sleep(3 * time.Second)
+	
+	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n",cid,topicName)
+	if token := subscriber.Subscribe(topicName, qos, callback); token.WaitTimeout(opTimeout) && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:      cid,
+			Event:        "SubscribeFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+
+		return
+	}
+	
+	time.Sleep(3 * time.Second)
+	
+
+	if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
+			fmt.Println(token.Error())
+			os.Exit(1)
+		}
+
+		subscriber.Disconnect(5)
+		verboseLogger.Printf("---[%d] unsubscribe\n", cid)
+		
+	}()
 	
 	for i := 0; i < *argNumClients; i++ {
 	topicName := fmt.Sprintf(topicNameTemplate, hostname, i)
