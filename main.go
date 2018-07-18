@@ -152,7 +152,7 @@ func main() {
 	}
 	
 	for i := 0; i < *argNumClients; i++ {
-	topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
+	topicName := fmt.Sprintf(topicNameTemplate, hostname, i)
 		token := publisher.Publish(topicName, qos, false, message)
 		verboseLogger.Printf("--Message published!-- [%s] topicName [%s] \n", message,topicName)
 		token.Wait()
