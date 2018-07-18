@@ -149,11 +149,15 @@ func main() {
 			TopicName: topicName,
 			Timeout:   testTimeout,
 		}).Run()
+	}
+	
+	for i := 0; i < *argNumClients; i++ {
+	topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
 		token := publisher.Publish(topicName, qos, false, message)
 		verboseLogger.Printf("--Message published!-- [%s] topicName [%s] \n", message,topicName)
 		token.Wait()
 	}
-	
+		
 	publisher.Disconnect(5)
 
 	publishTime := time.Since(time.Now())
