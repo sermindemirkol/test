@@ -25,7 +25,7 @@ func (w *Worker) Run() {
 
 	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, w.WorkerId, t)
 
-	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s publisherClientId=%s\n", cid, w.TopicName, subscriberClientId, publisherClientId)
+	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s\n", cid, w.TopicName, subscriberClientId)
 
 	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(30).AddBroker(w.BrokerUrl)
 
@@ -81,6 +81,7 @@ func (w *Worker) Run() {
 	publishedCount := 0
 
 
+	t0 = time.Now()
 	publishTime := time.Since(t0)
 
 	go func() {
@@ -88,7 +89,6 @@ func (w *Worker) Run() {
 		timeout <- true
 	}()
 
-	t0 = time.Now()
 	for receivedCount < w.Nmessages && !stopWorker {
 		select {
 		case <-queue:
