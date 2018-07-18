@@ -117,14 +117,8 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
-	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
-	rampUpSize := *argRampUpSize
 	message := *argMessage
 	qos := byte(*argQos)
-	
-	if rampUpSize < 0 {
-		rampUpSize = 100
-	}
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
 	
@@ -150,15 +144,9 @@ func main() {
 	}
 	
 	for cid := 0; cid < *argNumClients; cid++ {
-
-		if cid%rampUpSize == 0 && cid > 0 {
-			fmt.Printf("%d worker started - waiting %s qos: %d\n", cid, rampUpDelay,qos)
-			time.Sleep(rampUpDelay)
-		}
-		
 	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
 	  for i := 0; i < num; i++ {
-		verboseLogger.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
+		fmt.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
 		token := publisher.Publish(topicName, qos, false, message)
 		token.Wait()
 	  }
@@ -178,7 +166,7 @@ func main() {
 	publisher.Disconnect(5)
 
 	publishTime := time.Since(time.Now())
-	verboseLogger.Printf("all messages  %d \n",publishTime)
+	verboseLogger.Printf("all messages published\n")
 	
 	fmt.Printf("%d worker started\n", *argNumClients)
 
