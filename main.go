@@ -158,8 +158,8 @@ func main() {
 			fmt.Printf("%d worker started - waiting %s qos: %d\n", cid, rampUpDelay,qos)
 			time.Sleep(rampUpDelay)
 		}
-	  t0 := time.Now()
-	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid, t0)
+		
+	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
 	  for i := 0; i < num; i++ {
 		verboseLogger.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
 		token := publisher.Publish(topicName, qos, false, message)
