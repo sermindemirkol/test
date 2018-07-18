@@ -65,6 +65,7 @@ type Worker struct {
 type Result struct {
 	WorkerId          int
 	Event             string
+	PublishTime       time.Duration
 	ReceiveTime       time.Duration
 	MessagesReceived  int
 	MessagesPublished int
