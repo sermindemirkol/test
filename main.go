@@ -125,7 +125,7 @@ func main() {
 	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(username).SetPassword(password).SetKeepAlive(30).AddBroker(brokerUrl)
 	publisher := mqtt.NewClient(publisherOptions)
 	
-	verboseLogger.Printf(" connecting publisher  \n")
+	verboseLogger.Printf("---- connecting publisher --- \n")
 	if token := publisher.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     1,
@@ -137,12 +137,7 @@ func main() {
 	}
 	
 	for cid := 0; cid < *argNumClients; cid++ {
-	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
-	  for i := 0; i < num; i++ {
-		verboseLogger.Printf("[%s] [%d] with topicName [%s]\n", message,i,topicName)
-		token := publisher.Publish(topicName, qos, false, message)
-		token.Wait()
-	  }
+	    topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
 		go (&Worker{
 			WorkerId:  cid,
 			BrokerUrl: brokerUrl,
@@ -154,15 +149,15 @@ func main() {
 			TopicName: topicName,
 			Timeout:   testTimeout,
 		}).Run()
+		token := publisher.Publish(topicName, qos, false, message)
+		verboseLogger.Printf("--Message published!-- [%s] topicName [%s] \n", message,topicName)
+		token.Wait()
 	}
 	
 	publisher.Disconnect(5)
 
 	publishTime := time.Since(time.Now())
-	verboseLogger.Printf("all messages published %d \n",publishTime)
-	
-	fmt.Printf("%d worker started\n", *argNumClients)
-
+	verboseLogger.Printf("----all messages published--- %d \n",publishTime)
 	finEvents := 0
 
 	timeout := make(chan bool, 1)

@@ -36,7 +36,7 @@ func (w *Worker) Run() {
 	subscriber := mqtt.NewClient(subscriberOptions)
 
 	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
-	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "ConnectFailed",
