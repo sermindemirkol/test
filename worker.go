@@ -29,9 +29,7 @@ func (w *Worker) Run() {
 	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(30).AddBroker(w.BrokerUrl)
 
 	subscriberOptions.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
-		queue <- [2]string{msg.Topic(), string(msg.Payload())
-
-		}
+		queue <- [2]string{msg.Topic(), string(msg.Payload())}
 	})
 
 	var callback MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
