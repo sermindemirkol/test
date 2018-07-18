@@ -35,19 +35,6 @@ func (w *Worker) Run() {
 	
 	subscriber := mqtt.NewClient(subscriberOptions)
 
-	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n", w.WorkerId,w.TopicName)
-	if token := subscriber.Subscribe(w.TopicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "SubscribeFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-
-		return
-	}
-	
-	
 	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
 	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
@@ -60,7 +47,21 @@ func (w *Worker) Run() {
 		return
 	}
 	
-	time.Sleep(6 * time.Second)
+	time.Sleep(3 * time.Second)
+	
+	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n", w.WorkerId,w.TopicName)
+	if token := subscriber.Subscribe(w.TopicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:     w.WorkerId,
+			Event:        "SubscribeFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+
+		return
+	}
+	
+	time.Sleep(3 * time.Second)
 	
 	defer func() {
 		if token := subscriber.Unsubscribe(w.TopicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
