@@ -35,6 +35,10 @@ func (w *Worker) Run() {
 	
 	subscriber := mqtt.NewClient(subscriberOptions)
 
+subscriber.setCallback(
+
+
+)
 	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
 	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
@@ -94,7 +98,7 @@ func (w *Worker) Run() {
 		select {
 		case <-queue:
 			receivedCount++
-
+			verboseLogger.Printf("******************** [%s] \n",queue)
 			verboseLogger.Printf("[%d] %d/%d received\n", w.WorkerId, receivedCount, w.Nmessages)
 			if receivedCount == w.Nmessages {
 				resultChan <- Result{
