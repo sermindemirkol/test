@@ -32,7 +32,7 @@ func (w *Worker) Run() {
 		queue <- [2]string{msg.Topic(), string(msg.Payload())}
 	})
 
-	var callback MQTT.MessageHandler = func(client MQTT.Client, msg MQTT.Message) {
+	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
               verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
 	}
