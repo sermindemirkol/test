@@ -178,7 +178,7 @@ func main() {
 	publisher.Disconnect(5)
 
 	publishTime := time.Since(time.Now())
-	verboseLogger.Printf("[%d] all messages published\n", w.WorkerId)
+	verboseLogger.Printf("all messages published\n")
 	
 	fmt.Printf("%d worker started\n", *argNumClients)
 
