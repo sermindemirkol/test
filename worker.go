@@ -23,13 +23,9 @@ func (w *Worker) Run() {
 		panic(err)
 	}
 
-	topicName := fmt.Sprintf(topicNameTemplate, hostname, w.WorkerId, t)
-	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, w.WorkerId, t,)
-	publisherClientId := fmt.Sprintf(publisherClientIdTemplate, hostname, w.WorkerId, t)
+	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, w.WorkerId, t)
 
-	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s publisherClientId=%s\n", cid, topicName, subscriberClientId, publisherClientId)
-
-	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(30).AddBroker(w.BrokerUrl)
+	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s publisherClientId=%s\n", cid, w.TopicName, subscriberClientId, publisherClientId)
 
 	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(30).AddBroker(w.BrokerUrl)
 
@@ -37,21 +33,10 @@ func (w *Worker) Run() {
 		queue <- [2]string{msg.Topic(), string(msg.Payload())}
 	})
 
-	publisher := mqtt.NewClient(publisherOptions)
+	
 	subscriber := mqtt.NewClient(subscriberOptions)
 
-	verboseLogger.Printf("[%d] connecting publisher [%s] \n", w.WorkerId,topicName)
-	if token := publisher.Connect(); token.Wait() && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     w.WorkerId,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-		return
-	}
-
-	verboseLogger.Printf("[%d] connecting subscriber  [%s] \n", w.WorkerId,topicName)
+	verboseLogger.Printf("[%d] connecting subscriber  [%s] \n", w.WorkerId,w.TopicName)
 	if token := subscriber.Connect(); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
@@ -63,8 +48,8 @@ func (w *Worker) Run() {
 		return
 	}
 
-	verboseLogger.Printf("[%d] subscribing to topic [%s]\n", w.WorkerId,topicName)
-	if token := subscriber.Subscribe(topicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	verboseLogger.Printf("[%d] subscribing to topic [%s]\n", w.WorkerId,w.TopicName)
+	if token := subscriber.Subscribe(w.TopicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "SubscribeFailed",
@@ -78,7 +63,7 @@ func (w *Worker) Run() {
 	
 	
 	defer func() {
-		if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
+		if token := subscriber.Unsubscribe(w.TopicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
 			fmt.Println(token.Error())
 			os.Exit(1)
 		}
@@ -88,24 +73,15 @@ func (w *Worker) Run() {
 		
 	}()
 
-	verboseLogger.Printf("[%d] starting control loop %s\n", w.WorkerId, topicName)
+	verboseLogger.Printf("[%d] starting control loop %s\n", w.WorkerId, w.TopicName)
 
 	timeout := make(chan bool, 1)
 	stopWorker := false
 	receivedCount := 0
 	publishedCount := 0
 
-	t0 := time.Now()
-	for i := 0; i < w.Nmessages; i++ {
-		verboseLogger.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
-		token := publisher.Publish(topicName, qos, false, message)
-		publishedCount++
-		token.Wait()
-	}
-	publisher.Disconnect(5)
 
 	publishTime := time.Since(t0)
-	verboseLogger.Printf("[%d] all messages published\n", w.WorkerId)
 
 	go func() {
 		time.Sleep(w.Timeout)

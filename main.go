@@ -57,6 +57,7 @@ type Worker struct {
 	Nmessages int
 	Message  string
 	Qos 	 byte
+	TopicName string
 	Timeout   time.Duration
 }
 
@@ -96,7 +97,7 @@ func main() {
 	username := *argUsername
 	password := *argPassword
 	testTimeout, _ := time.ParseDuration(*argTimeout)
-
+	
 	verboseLogger.SetOutput(ioutil.Discard)
 	errorLogger.SetOutput(ioutil.Discard)
 
@@ -126,13 +127,43 @@ func main() {
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
 	
+	t1 := randomSource.Int31()
+	hostname, err := os.Hostname()
+	if err != nil {
+		panic(err)
+	}
+	
+	publisherClientId := fmt.Sprintf(publisherClientIdTemplate, hostname, 1, t1)
+	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(username).SetPassword(password).SetKeepAlive(30).AddBroker(brokerUrl)
+	publisher := mqtt.NewClient(publisherOptions)
+	
+	verboseLogger.Printf(" connecting publisher  \n")
+	if token := publisher.Connect(); token.Wait() && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:     1,
+			Event:        "ConnectFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+		return
+	}
+	
+
+	publisher.Disconnect(5)
+	
 	for cid := 0; cid < *argNumClients; cid++ {
 
 		if cid%rampUpSize == 0 && cid > 0 {
 			fmt.Printf("%d worker started - waiting %s qos: %d\n", cid, rampUpDelay,qos)
 			time.Sleep(rampUpDelay)
 		}
-		
+	  t0 := time.Now()
+	  topicName := fmt.Sprintf(topicNameTemplate, hostname, cid, t0)
+	  for i := 0; i < num; i++ {
+		verboseLogger.Printf("[%s] [%d] with topicname [%s]!", message,i,topicName)
+		token := publisher.Publish(topicName, qos, false, message)
+		token.Wait()
+	  }
 		go (&Worker{
 			WorkerId:  cid,
 			BrokerUrl: brokerUrl,
@@ -141,9 +172,11 @@ func main() {
 			Nmessages: num,
 			Message: message,
 			Qos: qos,
+			TopicName: topicName,
 			Timeout:   testTimeout,
 		}).Run()
 	}
+	
 	fmt.Printf("%d worker started\n", *argNumClients)
 
 	finEvents := 0
