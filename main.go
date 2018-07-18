@@ -149,9 +149,6 @@ func main() {
 		return
 	}
 	
-
-	publisher.Disconnect(5)
-	
 	for cid := 0; cid < *argNumClients; cid++ {
 
 		if cid%rampUpSize == 0 && cid > 0 {
@@ -177,6 +174,11 @@ func main() {
 			Timeout:   testTimeout,
 		}).Run()
 	}
+	
+	publisher.Disconnect(5)
+
+	publishTime := time.Since(time.Now())
+	verboseLogger.Printf("[%d] all messages published\n", w.WorkerId)
 	
 	fmt.Printf("%d worker started\n", *argNumClients)
 
