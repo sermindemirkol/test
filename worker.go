@@ -33,13 +33,10 @@ func (w *Worker) Run() {
 
 	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).AddBroker(w.BrokerUrl)
 
-	subscriberOptions.SetDefaultPublishHandler(func(client mqtt.Client, msg mqtt.Message) {
-		queue <- [2]string{msg.Topic(), string(msg.Payload())}
-	})
-
 	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
-              verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
+			  verboseLogger.Printf("[%d] *********TOPIC: %s*************\n",w.WorkerId, msg.Topic())
+              verboseLogger.Printf("[%d] **********MSG: %s**********\n",w.WorkerId, msg.Payload())
+              queue <- [2]string{msg.Topic(), string(msg.Payload())}
 	}
 	
 	publisher := mqtt.NewClient(publisherOptions)
