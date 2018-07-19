@@ -29,9 +29,9 @@ func (w *Worker) Run() {
 
 	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s publisherClientId=%s\n", cid, topicName, subscriberClientId, publisherClientId)
 
-	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(w.Username).SetPassword(w.Password).AddBroker(w.BrokerUrl)
+	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(60).AddBroker(w.BrokerUrl)
 
-	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).AddBroker(w.BrokerUrl)
+	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(60).AddBroker(w.BrokerUrl)
 
 	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			  verboseLogger.Printf("[%d] *********TOPIC: %s*************\n",w.WorkerId, msg.Topic())
