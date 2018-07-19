@@ -97,10 +97,18 @@ func (w *Worker) Run() {
 
 	t0 := time.Now()
 	for i := 0; i < w.Nmessages; i++ {
-		verboseLogger.Printf("[%s] [%d] !", message,i)
-		token := publisher.Publish(topicName, qos, false, message)
+	if token := publisher.Publish(topicName, qos, false, message); token.Wait() && token.Error() != nil {
+		resultChan <- Result{
+			WorkerId:     w.WorkerId,
+			Event:        "PublishFailed",
+			Error:        true,
+			ErrorMessage: token.Error(),
+		}
+		return
+	}
 		publishedCount++
-		token.Wait()
+		verboseLogger.Printf("[%d] message [%s] is published message count is  [%d] !", w.WorkerId, message,i)
+		
 	}
 	publisher.Disconnect(5)
 
