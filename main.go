@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	 mqtt "github.com/eclipse/paho.mqtt.golang"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -24,7 +23,7 @@ var (
 
 	subscriberClientIdTemplate = "mqtt-stresser-sub-%s-worker%d-%d"
 	publisherClientIdTemplate  = "mqtt-stresser-pub-%s-worker%d-%d"
-	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d"
+	topicNameTemplate          = "internal/mqtt-stresser/%s/worker%d-%d"
 
 	opTimeout = 20 * time.Second
 
@@ -43,11 +42,23 @@ var (
 	argBrokerUrl     = flag.String("broker", "", "Broker URL")
 	argUsername      = flag.String("username", "", "Username")
 	argPassword      = flag.String("password", "", "Password")
+	argLogLevel      = flag.Int("log-level", 0, "Log level (0=nothing, 1=errors, 2=debug, 3=error+debug)")
 	argProfileCpu    = flag.String("profile-cpu", "", "write cpu profile `file`")
 	argProfileMem    = flag.String("profile-mem", "", "write memory profile to `file`")
 	argHideProgress  = flag.Bool("no-progress", false, "Hide progress indicator")
 	argHelp          = flag.Bool("help", false, "Show help")
 )
+
+type Worker struct {
+	WorkerId  int
+	BrokerUrl string
+	Username  string
+	Password  string
+	Nmessages int
+	Message  string
+	Qos 	 byte
+	Timeout   time.Duration
+}
 
 type Result struct {
 	WorkerId          int
@@ -85,12 +96,18 @@ func main() {
 	username := *argUsername
 	password := *argPassword
 	testTimeout, _ := time.ParseDuration(*argTimeout)
-	
+
 	verboseLogger.SetOutput(ioutil.Discard)
 	errorLogger.SetOutput(ioutil.Discard)
-	errorLogger.SetOutput(os.Stderr)
-	verboseLogger.SetOutput(os.Stderr)
-	
+
+	if *argLogLevel == 1 || *argLogLevel == 3 {
+		errorLogger.SetOutput(os.Stderr)
+	}
+
+	if *argLogLevel == 2 || *argLogLevel == 3 {
+		verboseLogger.SetOutput(os.Stderr)
+	}
+
 	if brokerUrl == "" {
 		os.Exit(1)
 	}
@@ -98,97 +115,37 @@ func main() {
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, syscall.SIGINT, syscall.SIGTERM)
 
+	rampUpDelay, _ := time.ParseDuration(*argRampUpDelay)
+	rampUpSize := *argRampUpSize
 	message := *argMessage
 	qos := byte(*argQos)
+	
+	if rampUpSize < 0 {
+		rampUpSize = 100
+	}
 
 	resultChan = make(chan Result, *argNumClients**argNumMessages)
 	
-	t1 := randomSource.Int31()
-	hostname, err := os.Hostname()
-	if err != nil {
-		panic(err)
-	}
-	
-	publisherClientId := fmt.Sprintf(publisherClientIdTemplate, hostname, 1, t1)
-	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(username).SetPassword(password).SetKeepAlive(30).AddBroker(brokerUrl)
-	publisher := mqtt.NewClient(publisherOptions)
-	
-	verboseLogger.Printf("---- connecting publisher --- \n")
-	if token := publisher.Connect(); token.Wait() && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     1,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-		return
-	}
-	
 	for cid := 0; cid < *argNumClients; cid++ {
-	    topicName := fmt.Sprintf(topicNameTemplate, hostname, cid)
-	    
-	    
-	subscriberClientId := fmt.Sprintf(subscriberClientIdTemplate, hostname, cid, t1)
-	verboseLogger.Printf("[%d] topic=%s subscriberClientId=%s\n", cid,topicName, subscriberClientId)
 
-	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(username).SetPassword(password).SetKeepAlive(30).AddBroker(brokerUrl)
-	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
-			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
-              verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
-	}
-	
-	subscriber := mqtt.NewClient(subscriberOptions)
-	
-	verboseLogger.Printf("----[%d]--- connecting subscriber [%s]---- \n", w.WorkerId,w.TopicName)
-	if token := subscriber.Connect(); token.Wait() && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:     cid,
-			Event:        "ConnectFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
+		if cid%rampUpSize == 0 && cid > 0 {
+			fmt.Printf("%d worker started - waiting %s qos: %d\n", cid, rampUpDelay,qos)
+			time.Sleep(rampUpDelay)
 		}
-
-		return
-	}
-	
-	time.Sleep(3 * time.Second)
-	
-	verboseLogger.Printf("----[%d] subscribing to topic [%s]----\n",cid,topicName)
-	if token := subscriber.Subscribe(topicName, qos, callback); token.WaitTimeout(opTimeout) && token.Error() != nil {
-		resultChan <- Result{
-			WorkerId:      cid,
-			Event:        "SubscribeFailed",
-			Error:        true,
-			ErrorMessage: token.Error(),
-		}
-
-		return
-	}
-	
-	time.Sleep(3 * time.Second)
-	
-
-	if token := subscriber.Unsubscribe(topicName); token.WaitTimeout(opTimeout) && token.Error() != nil {
-			fmt.Println(token.Error())
-			os.Exit(1)
-		}
-
-		subscriber.Disconnect(5)
-		verboseLogger.Printf("---[%d] unsubscribe\n", cid)
 		
-	}()
-	
-	for i := 0; i < *argNumClients; i++ {
-	topicName := fmt.Sprintf(topicNameTemplate, hostname, i)
-		token := publisher.Publish(topicName, qos, false, message)
-		verboseLogger.Printf("--Message published!-- [%s] topicName [%s] \n", message,topicName)
-		token.Wait()
+		go (&Worker{
+			WorkerId:  cid,
+			BrokerUrl: brokerUrl,
+			Username:  username,
+			Password:  password,
+			Nmessages: num,
+			Message: message,
+			Qos: qos,
+			Timeout:   testTimeout,
+		}).Run()
 	}
-		
-	publisher.Disconnect(5)
+	fmt.Printf("%d worker started\n", *argNumClients)
 
-	publishTime := time.Since(time.Now())
-	verboseLogger.Printf("----all messages published--- %d \n",publishTime)
 	finEvents := 0
 
 	timeout := make(chan bool, 1)
