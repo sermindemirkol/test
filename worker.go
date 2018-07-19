@@ -97,7 +97,7 @@ func (w *Worker) Run() {
 
 	t0 := time.Now()
 	for i := 0; i < w.Nmessages; i++ {
-	if token := publisher.Publish(topicName, qos, false, message); token.Wait() && token.Error() != nil {
+	if token := publisher.Publish(topicName, qos, true, message); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "PublishFailed",
