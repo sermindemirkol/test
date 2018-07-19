@@ -37,6 +37,11 @@ func (w *Worker) Run() {
 		queue <- [2]string{msg.Topic(), string(msg.Payload())}
 	})
 
+	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+			  verboseLogger.Printf("*********TOPIC: %s*************\n", msg.Topic())
+              verboseLogger.Printf("**********MSG: %s**********\n", msg.Payload())
+	}
+	
 	publisher := mqtt.NewClient(publisherOptions)
 	subscriber := mqtt.NewClient(subscriberOptions)
 
@@ -64,7 +69,7 @@ func (w *Worker) Run() {
 	}
 
 	verboseLogger.Printf("[%d] subscribing to topic\n", w.WorkerId)
-	if token := subscriber.Subscribe(topicName, qos, nil); token.WaitTimeout(opTimeout) && token.Error() != nil {
+	if token := subscriber.Subscribe(topicName, qos, callback); token.WaitTimeout(opTimeout) && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "SubscribeFailed",
