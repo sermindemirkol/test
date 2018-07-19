@@ -108,7 +108,7 @@ func buildSummary(nClient int, nMessages int, results []Result) (Summary, error)
 		Completed:                   nCompleted,
 		InProgress:                  nInProgress,
 		ConnectFailed:               nConnectFailed,
-		PublishFailed				 nPublishFailed,
+		PublishFailed:				 nPublishFailed,
 		SubscribeFailed:             nSubscribeFailed,
 		TimeoutExceeded:             nTimeoutExceeded,
 		Aborted:                     nAborted,
