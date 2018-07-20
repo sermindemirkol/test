@@ -31,7 +31,7 @@ func (w *Worker) Run() {
 
 	publisherOptions := mqtt.NewClientOptions().SetClientID(publisherClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(60).AddBroker(w.BrokerUrl)
 
-	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetKeepAlive(60).AddBroker(w.BrokerUrl)
+	subscriberOptions := mqtt.NewClientOptions().SetClientID(subscriberClientId).SetUsername(w.Username).SetPassword(w.Password).SetCleanSession(false).SetKeepAlive(60).AddBroker(w.BrokerUrl)
 
 	var callback mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			  verboseLogger.Printf("[%d] *********TOPIC: %s*************\n",w.WorkerId, msg.Topic())
@@ -97,7 +97,7 @@ func (w *Worker) Run() {
 
 	t0 := time.Now()
 	for i := 0; i < w.Nmessages; i++ {
-	if token := publisher.Publish(topicName, qos, true, message); token.Wait() && token.Error() != nil {
+	if token := publisher.Publish(topicName, qos, false, message); token.Wait() && token.Error() != nil {
 		resultChan <- Result{
 			WorkerId:     w.WorkerId,
 			Event:        "PublishFailed",
